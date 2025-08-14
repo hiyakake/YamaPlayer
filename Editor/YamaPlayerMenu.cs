@@ -1,5 +1,6 @@
 using UnityEditor;
 using UnityEngine;
+using Yamadev.YamaStream.Components;
 
 namespace Yamadev.YamaStream.Editor
 {
@@ -31,6 +32,20 @@ namespace Yamadev.YamaStream.Editor
         [MenuItem(menuPrefix + "Playlist Panel", priority = 103)]
         public static void CreatePlaylistPanel() =>
             CreateGameObject(AssetDatabase.GUIDToAssetPath(_playlistPanelPrefabGuid));
+
+        [MenuItem(menuPrefix + "Playlist Visibility Controller", priority = 104)]
+        public static void CreatePlaylistVisibilityController()
+        {
+            GameObject obj = new GameObject("PlaylistVisibilityController");
+            Transform parent = Selection.activeTransform;
+            if (parent != null)
+            {
+                obj.transform.SetParent(parent);
+            }
+            obj.AddComponent<PlaylistVisibilityController>();
+            obj.name = GameObjectUtility.GetUniqueNameForSibling(parent, obj.name);
+            Selection.activeGameObject = obj;
+        }
 
         static void CreateGameObject(string path)
         {

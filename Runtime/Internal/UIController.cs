@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using UdonSharp;
 using UnityEngine;
@@ -675,20 +675,22 @@ namespace Yamadev.YamaStream.UI
         {
             if (_playlists == null) return;
             _playlists.CallbackEvent = UdonEvent.New(this, nameof(UpdatePlaylistsContent));
-            _playlists.Length = _controller.Playlists.Length;
+            _playlists.Length = _controller.VisiblePlaylists.Length;
         }
 
         public void UpdatePlaylistsContent()
         {
+            var visiblePlaylists = _controller.VisiblePlaylists;
             for (int i = 0; i < _playlists.LineCount; i++)
             {
                 if (_playlists.Indexes[i] == _playlists.LastIndexes[i] || _playlists.Indexes[i] == -1) continue;
                 Transform cell = _playlists.GetComponent<ScrollRect>().content.GetChild(i);
-                Playlist playlist = _controller.Playlists[_playlists.Indexes[i]];
+                if (_playlists.Indexes[i] >= visiblePlaylists.Length) continue;
+                Playlist playlist = visiblePlaylists[_playlists.Indexes[i]];
                 if (cell.TryFind("FolderMark", out var folderMark)) folderMark.gameObject.SetActive(!playlist.IsLoading);
                 if (cell.TryFind("Loading", out var loading)) loading.gameObject.SetActive(playlist.IsLoading);
                 if (cell.TryFind("Text", out var n) && n.TryGetComponentLocal(out Text name))
-                    name.text = _controller.Playlists[_playlists.Indexes[i]].PlaylistName;
+                    name.text = playlist.PlaylistName;
                 if (cell.TryFind("TrackCount", out var tr) && tr.TryGetComponentLocal(out Text trackCount))
                     trackCount.text = playlist.Length > 0 ? $"{i18n.GetValue("total")} {playlist.Length} {i18n.GetValue("tracks")}" : string.Empty;
                 if (cell.TryGetComponentLocal<IndexTrigger>(out var trigger)) trigger.SetProgramVariable("_varibaleObject", _playlists.Indexes[i]);

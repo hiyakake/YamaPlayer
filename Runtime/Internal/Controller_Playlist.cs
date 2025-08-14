@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using UdonSharp;
 using UnityEngine;
@@ -27,6 +27,23 @@ namespace Yamadev.YamaStream
                 var pl = DataList<Playlist>.New(_playlists);
                 pl.AddRange(DataList<Playlist>.New(_dynamicPlaylists));
                 return pl.ToArray();
+            }
+        }
+
+        public Playlist[] VisiblePlaylists
+        {
+            get
+            {
+                var allPlaylists = Playlists;
+                var visiblePlaylists = DataList<Playlist>.New();
+                for (int i = 0; i < allPlaylists.Length; i++)
+                {
+                    if (allPlaylists[i].IsVisible)
+                    {
+                        visiblePlaylists.Add(allPlaylists[i]);
+                    }
+                }
+                return visiblePlaylists.ToArray();
             }
         }
 
@@ -75,6 +92,56 @@ namespace Yamadev.YamaStream
                 newPlaylist.LoadPlaylist(_dynamicUrls[i]);
             }
             SendCustomVideoEvent(nameof(Listener.OnPlaylistsUpdated));
+        }
+
+        public void SetPlaylistVisibility(string playlistName, bool isVisible)
+        {
+            var allPlaylists = Playlists;
+            for (int i = 0; i < allPlaylists.Length; i++)
+            {
+                if (allPlaylists[i].PlaylistName == playlistName)
+                {
+                    allPlaylists[i].SetVisibility(isVisible);
+                    return;
+                }
+            }
+        }
+
+        public void SetPlaylistVisibilityByIndex(int index, bool isVisible)
+        {
+            var allPlaylists = Playlists;
+            if (index >= 0 && index < allPlaylists.Length)
+            {
+                allPlaylists[index].SetVisibility(isVisible);
+            }
+        }
+
+        public void HidePlaylist(string playlistName)
+        {
+            SetPlaylistVisibility(playlistName, false);
+        }
+
+        public void ShowPlaylist(string playlistName)
+        {
+            SetPlaylistVisibility(playlistName, true);
+        }
+
+        public void HideAllPlaylists()
+        {
+            var allPlaylists = Playlists;
+            for (int i = 0; i < allPlaylists.Length; i++)
+            {
+                allPlaylists[i].SetVisibility(false);
+            }
+        }
+
+        public void ShowAllPlaylists()
+        {
+            var allPlaylists = Playlists;
+            for (int i = 0; i < allPlaylists.Length; i++)
+            {
+                allPlaylists[i].SetVisibility(true);
+            }
         }
 
         public void PlayTrack(Playlist playlist, int index)

@@ -1,4 +1,4 @@
-﻿
+
 using UdonSharp;
 using UnityEngine;
 using VRC.SDK3.StringLoading;
@@ -21,6 +21,7 @@ namespace Yamadev.YamaStream
         [SerializeField, UdonSynced] string[] _titles = new string[] { };
         [SerializeField, UdonSynced] VRCUrl[] _urls = new VRCUrl[] { };
         [SerializeField, UdonSynced] string[] _originalUrls = new string[] { };
+        [SerializeField, UdonSynced] bool _isVisible = true;
         #endregion
         DataList<Track> _tracks;
         bool _isLoading;
@@ -54,6 +55,8 @@ namespace Yamadev.YamaStream
         public bool IsLoading => _isLoading;
 
         public bool Loaded => _loaded;
+
+        public bool IsVisible => _isVisible;
 
         public Track GetTrack(int index)
         {
@@ -93,6 +96,16 @@ namespace Yamadev.YamaStream
             Tracks.RemoveAt(index);
             Tracks.Insert(index + 1, track);
             SendEvent();
+        }
+
+        public void SetVisibility(bool isVisible)
+        {
+            if (_isVisible != isVisible)
+            {
+                _isVisible = isVisible;
+                if (_isObjectOwner && !_controller.IsLocal) SyncVariables();
+                _controller.SendCustomVideoEvent(nameof(Listener.OnPlaylistsUpdated));
+            }
         }
 
         public void LoadPlaylist(VRCUrl url)
