@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using UdonSharp;
 using UnityEngine;
@@ -7,6 +7,7 @@ using VRC.SDK3.Components;
 using VRC.SDK3.Components.Video;
 using VRC.SDK3.Data;
 using VRC.SDKBase;
+using Yamadev.YamaStream.Libraries.GenericDataContainer;
 
 namespace Yamadev.YamaStream.UI
 {
@@ -207,6 +208,50 @@ namespace Yamadev.YamaStream.UI
         int _permissionIndex = -1;
         int _playlistIndex = -1;
         int _playlistTrackIndex = -1;
+        
+        // Runtime filter for playlist visibility
+        string[] _hiddenPlaylistNames = new string[] { };
+        
+        public void HidePlaylistByName(string playlistName)
+        {
+            if (string.IsNullOrEmpty(playlistName)) return;
+            if (Array.IndexOf(_hiddenPlaylistNames, playlistName) >= 0) return;
+            _hiddenPlaylistNames = _hiddenPlaylistNames.Add(playlistName);
+            GeneratePlaylistView();
+        }
+        
+        public void ShowPlaylistByName(string playlistName)
+        {
+            if (string.IsNullOrEmpty(playlistName)) return;
+            if (Array.IndexOf(_hiddenPlaylistNames, playlistName) < 0) return;
+            _hiddenPlaylistNames = _hiddenPlaylistNames.Remove(playlistName);
+            GeneratePlaylistView();
+        }
+        
+        public void ClearHiddenPlaylists()
+        {
+            _hiddenPlaylistNames = new string[] { };
+            GeneratePlaylistView();
+        }
+
+        // Event argument for name-based playlist visibility control
+        string _playlistNameEventArg;
+        
+        // Event wrappers (parameterless) to be invoked via UdonEvent with arguments injected via SetProgramVariable
+        public void HidePlaylistEvent()
+        {
+            HidePlaylistByName(_playlistNameEventArg);
+        }
+        
+        public void ShowPlaylistEvent()
+        {
+            ShowPlaylistByName(_playlistNameEventArg);
+        }
+        
+        public void ClearHiddenPlaylistsEvent()
+        {
+            ClearHiddenPlaylists();
+        }
 
         void Start()
         {
@@ -674,24 +719,43 @@ namespace Yamadev.YamaStream.UI
         public void GeneratePlaylistView()
         {
             if (_playlists == null) return;
+            _updateVisiblePlaylistIndexMap();
             _playlists.CallbackEvent = UdonEvent.New(this, nameof(UpdatePlaylistsContent));
-            _playlists.Length = _controller.Playlists.Length;
+            _playlists.Length = _visiblePlaylistIndexes.Length;
         }
-
+        
+        // Mapping from visible row to original playlist index
+        int[] _visiblePlaylistIndexes = new int[] { };
+        
+        void _updateVisiblePlaylistIndexMap()
+        {
+            Playlist[] pls = _controller.Playlists;
+            DataList<int> map = DataList<int>.New();
+            for (int i = 0; i < pls.Length; i++)
+            {
+                string name = pls[i].PlaylistName;
+                if (Array.IndexOf(_hiddenPlaylistNames, name) >= 0) continue;
+                map.Add(i);
+            }
+            _visiblePlaylistIndexes = map.ToArray();
+        }
+        
         public void UpdatePlaylistsContent()
         {
             for (int i = 0; i < _playlists.LineCount; i++)
             {
                 if (_playlists.Indexes[i] == _playlists.LastIndexes[i] || _playlists.Indexes[i] == -1) continue;
                 Transform cell = _playlists.GetComponent<ScrollRect>().content.GetChild(i);
-                Playlist playlist = _controller.Playlists[_playlists.Indexes[i]];
+                if (_playlists.Indexes[i] < 0 || _playlists.Indexes[i] >= _visiblePlaylistIndexes.Length) continue;
+                int originalIndex = _visiblePlaylistIndexes[_playlists.Indexes[i]];
+                Playlist playlist = _controller.Playlists[originalIndex];
                 if (cell.TryFind("FolderMark", out var folderMark)) folderMark.gameObject.SetActive(!playlist.IsLoading);
                 if (cell.TryFind("Loading", out var loading)) loading.gameObject.SetActive(playlist.IsLoading);
                 if (cell.TryFind("Text", out var n) && n.TryGetComponentLocal(out Text name))
-                    name.text = _controller.Playlists[_playlists.Indexes[i]].PlaylistName;
+                    name.text = playlist.PlaylistName;
                 if (cell.TryFind("TrackCount", out var tr) && tr.TryGetComponentLocal(out Text trackCount))
                     trackCount.text = playlist.Length > 0 ? $"{i18n.GetValue("total")} {playlist.Length} {i18n.GetValue("tracks")}" : string.Empty;
-                if (cell.TryGetComponentLocal<IndexTrigger>(out var trigger)) trigger.SetProgramVariable("_varibaleObject", _playlists.Indexes[i]);
+                if (cell.TryGetComponentLocal<IndexTrigger>(out var trigger)) trigger.SetProgramVariable("_varibaleObject", originalIndex);
             }
         }
 
@@ -1148,7 +1212,11 @@ namespace Yamadev.YamaStream.UI
         {
             if (_isHistoryPage) GeneratePlaylistTracks();
         }
-        public override void OnPlaylistsUpdated() => GeneratePlaylistView();
+        public override void OnPlaylistsUpdated()
+        {
+            _updateVisiblePlaylistIndexMap();
+            GeneratePlaylistView();
+        }
         public override void OnVolumeChanged() => updateAudioView();
         public override void OnMuteChanged() => updateAudioView();
         public override void OnUseAudioLinkChanged() => updateAudioView();
